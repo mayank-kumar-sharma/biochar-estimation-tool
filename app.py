@@ -1,8 +1,5 @@
 import streamlit as st
 from PIL import Image
-import math
-import io
-import base64
 from shapely.geometry import Polygon
 import re
 
@@ -15,7 +12,7 @@ FEEDSTOCK_DATA = {
     "Bamboo": {"density": 180, "yield_factor": 0.33, "default_height": 0.25},
     "Sugarcane bagasse": {"density": 140, "yield_factor": 0.22, "default_height": 0.2},
     "Groundnut shells": {"density": 130, "yield_factor": 0.26, "default_height": 0.2},
-    "Sludge": {"density": 110, "yield_factor": 0.20, "default_height": 0.2},  # Added sludge
+    "Sludge": {"density": 110, "yield_factor": 0.20, "default_height": 0.2},
 }
 
 DEFAULT_RESOLUTION = 10  # meters per pixel for JPEG images
@@ -54,16 +51,22 @@ elif area_input_method == "Polygon Coordinates":
             st.success(f"Polygon area: {area_m2/10000:.2f} hectares")
         else:
             st.info("Please enter at least 3 coordinate points.")
-    except Exception as e:
+    except Exception:
         st.warning("Invalid coordinate format.")
 
 elif area_input_method == "Upload JPEG Image":
     uploaded_image = st.file_uploader("Upload JPEG Image:", type=["jpg", "jpeg"])
     if uploaded_image:
+        resolution_input = st.number_input(
+            f"Enter image resolution (meters per pixel, leave 0 for default {DEFAULT_RESOLUTION} m/pixel):",
+            min_value=0.0, value=0.0, step=0.1, format="%.2f"
+        )
+        resolution = resolution_input if resolution_input > 0 else DEFAULT_RESOLUTION
+
         image = Image.open(uploaded_image)
         width, height = image.size
-        area_m2 = (width * height) * (DEFAULT_RESOLUTION ** 2)  # pixels * (10m)^2
-        st.success(f"Image size: {width} x {height} pixels | Estimated area: {area_m2/10000:.2f} hectares (using default {DEFAULT_RESOLUTION} m/pixel)")
+        area_m2 = (width * height) * (resolution ** 2)
+        st.success(f"Image size: {width} x {height} pixels | Resolution used: {resolution} m/pixel | Estimated area: {area_m2/10000:.2f} hectares")
 
 # --- Pile Height ---
 st.subheader("2️⃣ Enter Feedstock Pile Height")
@@ -99,3 +102,6 @@ if calculate:
     else:
         st.info("Please complete all inputs to see results.")
 
+# --- Footer ---
+st.markdown("<hr>", unsafe_allow_html=True)
+st.markdown("❤️ Made with love by **Mayank Kumar Sharma**")
