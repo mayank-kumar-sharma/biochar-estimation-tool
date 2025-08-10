@@ -15,6 +15,7 @@ FEEDSTOCK_DATA = {
     "Bamboo": {"density": 180, "yield_factor": 0.33, "default_height": 0.25},
     "Sugarcane bagasse": {"density": 140, "yield_factor": 0.22, "default_height": 0.2},
     "Groundnut shells": {"density": 130, "yield_factor": 0.26, "default_height": 0.2},
+    "Sludge": {"density": 110, "yield_factor": 0.20, "default_height": 0.2},  # Added sludge
 }
 
 DEFAULT_RESOLUTION = 10  # meters per pixel for JPEG images
@@ -62,35 +63,39 @@ elif area_input_method == "Upload JPEG Image":
         image = Image.open(uploaded_image)
         width, height = image.size
         area_m2 = (width * height) * (DEFAULT_RESOLUTION ** 2)  # pixels * (10m)^2
-        st.success(f"Image size: {width} x {height} pixels | Estimated area: {area_m2/10000:.2f} hectares")
+        st.success(f"Image size: {width} x {height} pixels | Estimated area: {area_m2/10000:.2f} hectares (using default {DEFAULT_RESOLUTION} m/pixel)")
 
 # --- Pile Height ---
 st.subheader("2️⃣ Enter Feedstock Pile Height")
 def_height = feedstock_info["default_height"]
 height_m = st.number_input(f"Enter height of biomass pile in meters (default: {def_height} m):", min_value=0.0, value=def_height, step=0.01)
 
+# --- Calculate Button ---
+calculate = st.button("Calculate Biochar Estimates")
+
 # --- Calculations ---
-if area_m2 and height_m > 0:
-    volume = area_m2 * height_m  # m³
-    density = feedstock_info["density"]
-    yield_factor = feedstock_info["yield_factor"]
+if calculate:
+    if area_m2 and height_m > 0:
+        volume = area_m2 * height_m  # m³
+        density = feedstock_info["density"]
+        yield_factor = feedstock_info["yield_factor"]
 
-    biomass_kg = volume * density
-    biochar_kg = biomass_kg * yield_factor
-    area_ha = area_m2 / 10000
-    application_rate = biochar_kg / area_ha if area_ha > 0 else 0
+        biomass_kg = volume * density
+        biochar_kg = biomass_kg * yield_factor
+        area_ha = area_m2 / 10000
+        application_rate = biochar_kg / area_ha if area_ha > 0 else 0
 
-    st.subheader("📊 Results")
-    st.write(f"**Estimated Biomass Input:** {biomass_kg:,.2f} kg")
-    st.write(f"**Estimated Biochar Yield:** {biochar_kg:,.2f} kg")
-    st.write(f"**Application Rate:** {application_rate:,.2f} kg/ha")
+        st.subheader("📊 Results")
+        st.write(f"**Estimated Biomass Input:** {biomass_kg:,.2f} kg")
+        st.write(f"**Estimated Biochar Yield:** {biochar_kg:,.2f} kg")
+        st.write(f"**Application Rate:** {application_rate:,.2f} kg/ha")
 
-    with st.expander("📌 Calculation Details"):
-        st.write(f"Feedstock: {feedstock_type}")
-        st.write(f"Area: {area_m2:.2f} m²")
-        st.write(f"Height: {height_m} m")
-        st.write(f"Density: {density} kg/m³")
-        st.write(f"Yield Factor: {yield_factor}")
+        with st.expander("📌 Calculation Details"):
+            st.write(f"Feedstock: {feedstock_type}")
+            st.write(f"Area: {area_m2:.2f} m²")
+            st.write(f"Height: {height_m} m")
+            st.write(f"Density: {density} kg/m³")
+            st.write(f"Yield Factor: {yield_factor}")
+    else:
+        st.info("Please complete all inputs to see results.")
 
-else:
-    st.info("Please complete all inputs to see results.")
