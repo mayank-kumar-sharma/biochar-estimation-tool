@@ -1,8 +1,5 @@
 import streamlit as st
 from PIL import Image
-import math
-import io
-import base64
 from shapely.geometry import Polygon
 import re
 
@@ -15,21 +12,23 @@ FEEDSTOCK_DATA = {
     "Bamboo": {"density": 180, "yield_factor": 0.33, "default_height": 0.25},
     "Sugarcane bagasse": {"density": 140, "yield_factor": 0.22, "default_height": 0.2},
     "Groundnut shells": {"density": 130, "yield_factor": 0.26, "default_height": 0.2},
-    "Sludge": {"density": 1100, "yield_factor": 0.5, "default_height": 0.15},
+    "Sludge": {"density": 110, "yield_factor": 0.5, "default_height": 0.15},
 }
 
-DEFAULT_RESOLUTION = 1  # meters per pixel for JPEG images (fixed)
-COVERAGE_FRACTION = 0.05  # 5% of land actually covered with feedstock
+# Fixed defaults
+DEFAULT_RESOLUTION = 1      # meters per pixel for JPEG images (fixed)
+COVERAGE_FRACTION = 0.05    # 5% of land actually covered by feedstock piles
 
 st.set_page_config(page_title="Biochar Estimator", layout="centered")
 st.title("🌱 Biochar Yield and Application Estimator")
 
 st.markdown("""
-This tool estimates:
-1. Biomass input based on area and feedstock type.
-2. Biochar yield using a predefined yield factor.
-3. Biochar application rate in kg per hectare.
-Now also shows practical estimates assuming only part of your land is covered with feedstock piles.
+This tool estimates the **practical** biomass and biochar you can expect given:
+- a feedstock type,
+- land area (ha), and
+- pile height (m).
+
+**Practical estimate** assumes that only **5%** of your land is actually covered by biomass piles (this keeps results realistic for most farms).
 """)
 
 # --- Feedstock Selection ---
@@ -52,67 +51,59 @@ elif area_input_method == "Polygon Coordinates":
         coords = [tuple(map(float, re.split(r"[,\s]+", line.strip()))) for line in coords_text.strip().split("\n") if line.strip()]
         if len(coords) >= 3:
             polygon = Polygon(coords)
-            area_m2 = polygon.area * (111_000 ** 2)  # crude lat/lon to m² conversion
+            # crude lat/lon to m² conversion (approx)
+            area_m2 = polygon.area * (111_000 ** 2)
             st.success(f"Polygon area: {area_m2/10000:.2f} hectares")
         else:
             st.info("Please enter at least 3 coordinate points.")
-    except Exception as e:
-        st.warning("Invalid coordinate format.")
+    except Exception:
+        st.warning("Invalid coordinate format. Please use 'lat,lon' per line.")
 
 elif area_input_method == "Upload JPEG Image":
-    uploaded_image = st.file_uploader("Upload JPEG Image:", type=["jpg", "jpeg"])
+    uploaded_image = st.file_uploader("Upload JPEG Image (optional):", type=["jpg", "jpeg"])
     if uploaded_image:
         image = Image.open(uploaded_image)
         width, height = image.size
         area_m2 = (width * height) * (DEFAULT_RESOLUTION ** 2)
-        st.success(f"Image size: {width} x {height} pixels | Resolution used: {DEFAULT_RESOLUTION} m/pixel | Estimated area: {area_m2/10000:.2f} hectares")
+        st.success(f"Image size: {width} x {height} pixels | "
+                   f"Assumed resolution: {DEFAULT_RESOLUTION} m/pixel | "
+                   f"Estimated area: {area_m2/10000:.2f} hectares")
 
 # --- Pile Height ---
 st.subheader("2️⃣ Enter Feedstock Pile Height")
 def_height = feedstock_info["default_height"]
-height_m = st.number_input(f"Enter height of biomass pile in meters (default: {def_height} m):", min_value=0.0, value=def_height, step=0.01)
+height_m = st.number_input(f"Enter pile height (meters) — default: {def_height} m:", min_value=0.0, value=def_height, step=0.01)
 
 # --- Calculate Button ---
-if st.button("📊 Calculate Results"):
-    if area_m2 and height_m > 0:
+if st.button("📊 Show Practical Estimate"):
+    if not area_m2 or height_m <= 0:
+        st.info("Please complete all inputs (area and pile height) to see results.")
+    else:
         density = feedstock_info["density"]
         yield_factor = feedstock_info["yield_factor"]
-        area_ha = area_m2 / 10000
+        area_ha = area_m2 / 10000.0
 
-        # Full coverage calculation
-        volume_full = area_m2 * height_m
-        biomass_full = volume_full * density
-        biochar_full = biomass_full * yield_factor
-        app_rate_full = biochar_full / area_ha if area_ha > 0 else 0
+        # Practical: assume piles occupy only a fraction of the field
+        pile_area_m2 = area_m2 * COVERAGE_FRACTION
+        volume_m3 = pile_area_m2 * height_m
+        biomass_kg = volume_m3 * density
+        biochar_kg = biomass_kg * yield_factor
+        application_rate_kg_per_ha = biochar_kg / area_ha if area_ha > 0 else 0
 
-        # Coverage-adjusted calculation
-        area_m2_practical = area_m2 * COVERAGE_FRACTION
-        area_ha_practical = area_m2_practical / 10000
-        volume_practical = area_m2_practical * height_m
-        biomass_practical = volume_practical * density
-        biochar_practical = biomass_practical * yield_factor
-        app_rate_practical = biochar_practical / area_ha if area_ha > 0 else 0
+        st.subheader(f"✅ Practical Results (assuming {COVERAGE_FRACTION*100:.1f}% pile coverage)")
+        st.write(f"**Estimated Biomass Input:** {biomass_kg:,.2f} kg")
+        st.write(f"**Estimated Biochar Yield:** {biochar_kg:,.2f} kg")
+        st.write(f"**Application Rate (over full area):** {application_rate_kg_per_ha:,.2f} kg/ha")
 
-        st.subheader("📊 Results (Full Coverage - Theoretical)")
-        st.write(f"**Estimated Biomass Input:** {biomass_full:,.2f} kg")
-        st.write(f"**Estimated Biochar Yield:** {biochar_full:,.2f} kg")
-        st.write(f"**Application Rate:** {app_rate_full:,.2f} kg/ha")
-
-        st.subheader("✅ Practical Results (with 5% coverage)")
-        st.write(f"**Estimated Biomass Input:** {biomass_practical:,.2f} kg")
-        st.write(f"**Estimated Biochar Yield:** {biochar_practical:,.2f} kg")
-        st.write(f"**Application Rate:** {app_rate_practical:,.2f} kg/ha")
-
-        with st.expander("📌 Calculation Details"):
+        with st.expander("📌 Calculation Details (practical)"):
             st.write(f"Feedstock: {feedstock_type}")
-            st.write(f"Area: {area_m2:.2f} m² ({area_ha:.2f} ha)")
-            st.write(f"Height: {height_m} m")
+            st.write(f"Total area: {area_m2:.2f} m² ({area_ha:.2f} ha)")
+            st.write(f"Pile footprint (assumed): {pile_area_m2:.2f} m² ({pile_area_m2/10000:.2f} ha)")
+            st.write(f"Pile height: {height_m} m")
+            st.write(f"Volume (piles): {volume_m3:.2f} m³")
             st.write(f"Density: {density} kg/m³")
-            st.write(f"Yield Factor: {yield_factor}")
-            st.write(f"Coverage Fraction: {COVERAGE_FRACTION*100:.1f}%")
-
-    else:
-        st.info("Please complete all inputs to see results.")
+            st.write(f"Yield factor: {yield_factor}")
+            st.write(f"Coverage fraction used: {COVERAGE_FRACTION:.3f} ({COVERAGE_FRACTION*100:.1f}%)")
 
 st.markdown("---")
 st.markdown("Made with ❤️ by **Mayank Kumar Sharma**")
