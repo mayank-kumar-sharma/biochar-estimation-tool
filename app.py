@@ -2,6 +2,7 @@ import streamlit as st
 from PIL import Image
 from shapely.geometry import Polygon
 import re
+from pyproj import Geod
 
 # --- Static Lookup Tables ---
 FEEDSTOCK_DATA = {
@@ -12,12 +13,15 @@ FEEDSTOCK_DATA = {
     "Bamboo": {"density": 180, "yield_factor": 0.33, "default_height": 0.25},
     "Sugarcane bagasse": {"density": 140, "yield_factor": 0.22, "default_height": 0.2},
     "Groundnut shells": {"density": 130, "yield_factor": 0.26, "default_height": 0.2},
-    "Sludge": {"density": 110, "yield_factor": 0.5, "default_height": 0.15},
+    "Sludge": {"density": 110, "yield_factor": 0.50, "default_height": 0.15},
 }
 
 # Fixed defaults
 DEFAULT_RESOLUTION = 1      # meters per pixel for JPEG images (fixed)
 COVERAGE_FRACTION = 0.05    # 5% of land actually covered by feedstock piles
+
+# Geod for accurate area from lat/lon
+geod = Geod(ellps="WGS84")
 
 st.set_page_config(page_title="Biochar Estimator", layout="centered")
 st.title("🌱 Biochar Yield and Application Estimator")
@@ -50,9 +54,10 @@ elif area_input_method == "Polygon Coordinates":
     try:
         coords = [tuple(map(float, re.split(r"[,\s]+", line.strip()))) for line in coords_text.strip().split("\n") if line.strip()]
         if len(coords) >= 3:
-            polygon = Polygon(coords)
-            # crude lat/lon to m² conversion (approx)
-            area_m2 = polygon.area * (111_000 ** 2)
+            # Compute accurate geodesic area (m²)
+            lons, lats = zip(*[(lon, lat) for lat, lon in coords])
+            area_m2, _ = geod.polygon_area_perimeter(lons, lats)
+            area_m2 = abs(area_m2)  # in case area is negative due to orientation
             st.success(f"Polygon area: {area_m2/10000:.2f} hectares")
         else:
             st.info("Please enter at least 3 coordinate points.")
