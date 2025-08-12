@@ -17,7 +17,7 @@ FEEDSTOCK_DATA = {
 }
 
 # Fixed defaults
-DEFAULT_RESOLUTION = 1      # meters per pixel for JPEG images (fixed)
+DEFAULT_RESOLUTION = 0.1    # meters per pixel for JPEG images (updated to 0.1 m/pixel)
 COVERAGE_FRACTION = 0.05    # 5% of land actually covered by feedstock piles
 
 # Geod for accurate area from lat/lon
@@ -36,8 +36,12 @@ This tool estimates the **practical** biomass and biochar you can expect given:
 """)
 
 # --- Feedstock Selection ---
-feedstock_type = st.selectbox("Select Feedstock Type", list(FEEDSTOCK_DATA.keys()))
-feedstock_info = FEEDSTOCK_DATA[feedstock_type]
+feedstock_type = st.selectbox(
+    "Select Feedstock Type",
+    [f"{name} ({data['density']} kg/m³, yield {int(data['yield_factor']*100)}%)" for name, data in FEEDSTOCK_DATA.items()]
+)
+feedstock_key = feedstock_type.split(" (")[0]
+feedstock_info = FEEDSTOCK_DATA[feedstock_key]
 
 # --- Area Input Options ---
 st.subheader("1️⃣ Enter Land Area")
@@ -100,8 +104,12 @@ if st.button("📊 Show Practical Estimate"):
         st.write(f"**Estimated Biochar Yield:** {biochar_kg:,.2f} kg")
         st.write(f"**Application Rate (over full area):** {application_rate_kg_per_ha:,.2f} kg/ha")
 
+        # Warning if application rate exceeds 10 t/ha
+        if application_rate_kg_per_ha > 10000:
+            st.warning("⚠ The application rate exceeds the recommended maximum of 10 t/ha. Consider reducing pile height or coverage.")
+
         with st.expander("📌 Calculation Details (practical)"):
-            st.write(f"Feedstock: {feedstock_type}")
+            st.write(f"Feedstock: {feedstock_key}")
             st.write(f"Total area: {area_m2:.2f} m² ({area_ha:.2f} ha)")
             st.write(f"Pile footprint (assumed): {pile_area_m2:.2f} m² ({pile_area_m2/10000:.2f} ha)")
             st.write(f"Pile height: {height_m} m")
