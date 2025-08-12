@@ -38,10 +38,9 @@ This tool estimates the **practical** biomass and biochar you can expect given:
 # --- Feedstock Selection ---
 feedstock_type = st.selectbox(
     "Select Feedstock Type",
-    [f"{name} ({data['density']} kg/m³, yield {int(data['yield_factor']*100)}%)" for name, data in FEEDSTOCK_DATA.items()]
+    list(FEEDSTOCK_DATA.keys())  # Only show feedstock names, no extra details
 )
-feedstock_key = feedstock_type.split(" (")[0]
-feedstock_info = FEEDSTOCK_DATA[feedstock_key]
+feedstock_info = FEEDSTOCK_DATA[feedstock_type]
 
 # --- Area Input Options ---
 st.subheader("1️⃣ Enter Land Area")
@@ -58,10 +57,9 @@ elif area_input_method == "Polygon Coordinates":
     try:
         coords = [tuple(map(float, re.split(r"[,\s]+", line.strip()))) for line in coords_text.strip().split("\n") if line.strip()]
         if len(coords) >= 3:
-            # Compute accurate geodesic area (m²)
             lons, lats = zip(*[(lon, lat) for lat, lon in coords])
             area_m2, _ = geod.polygon_area_perimeter(lons, lats)
-            area_m2 = abs(area_m2)  # in case area is negative due to orientation
+            area_m2 = abs(area_m2)
             st.success(f"Polygon area: {area_m2/10000:.2f} hectares")
         else:
             st.info("Please enter at least 3 coordinate points.")
@@ -92,7 +90,6 @@ if st.button("📊 Show Practical Estimate"):
         yield_factor = feedstock_info["yield_factor"]
         area_ha = area_m2 / 10000.0
 
-        # Practical: assume piles occupy only a fraction of the field
         pile_area_m2 = area_m2 * COVERAGE_FRACTION
         volume_m3 = pile_area_m2 * height_m
         biomass_kg = volume_m3 * density
@@ -104,12 +101,11 @@ if st.button("📊 Show Practical Estimate"):
         st.write(f"**Estimated Biochar Yield:** {biochar_kg:,.2f} kg")
         st.write(f"**Application Rate (over full area):** {application_rate_kg_per_ha:,.2f} kg/ha")
 
-        # Warning if application rate exceeds 10 t/ha
         if application_rate_kg_per_ha > 10000:
             st.warning("⚠ The application rate exceeds the recommended maximum of 10 t/ha. Consider reducing pile height or coverage.")
 
         with st.expander("📌 Calculation Details (practical)"):
-            st.write(f"Feedstock: {feedstock_key}")
+            st.write(f"Feedstock: {feedstock_type}")
             st.write(f"Total area: {area_m2:.2f} m² ({area_ha:.2f} ha)")
             st.write(f"Pile footprint (assumed): {pile_area_m2:.2f} m² ({pile_area_m2/10000:.2f} ha)")
             st.write(f"Pile height: {height_m} m")
