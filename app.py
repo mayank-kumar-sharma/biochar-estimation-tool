@@ -69,14 +69,14 @@ elif area_input_method == "Upload JPEG Image":
     # --- Ask photo source first ---
     photo_source = st.selectbox(
         "Select photo source:",
-        ["Rooftop (~0.10 m/pixel)", "Drone Low (~0.50 m/pixel)", "Drone High (~1.00 m/pixel)", "Satellite (~0.08 m/pixel)"]
+        ["Rooftop (~0.10 m/pixel)", "Drone Low (~0.50 m/pixel)", "Drone High (~1.00 m/pixel)", "Satellite (~0.02m/pixel)"]
     )
 
     resolution_map = {
         "Rooftop (~0.10 m/pixel)": 0.10,
         "Drone Low (~0.50 m/pixel)": 0.50,
         "Drone High (~1.00 m/pixel)": 1.00,
-        "Satellite (~0.08 m/pixel)": 0.08
+        "Satellite (~0.02 m/pixel)": 0.02
     }
     resolution = resolution_map[photo_source]
 
