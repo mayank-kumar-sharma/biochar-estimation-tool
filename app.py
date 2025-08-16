@@ -46,14 +46,14 @@ elif area_method == "Polygon coordinates (lat/lon)":
 elif area_method == "Upload JPEG image":
     resolution_choice = st.selectbox(
         "Select image source (defines resolution):",
-        ["Rooftop (~0.1 m/pixel)", "Low Drone (~0.5 m/pixel)", "High Drone (~1 m/pixel)", "Satellite (~10 m/pixel)"]
+        ["Rooftop (~0.1 m/pixel)", "Low Drone (~0.5 m/pixel)", "High Drone (~1 m/pixel)", "Satellite (~0.1 m/pixel)"]
     )
 
     resolution_map = {
         "Rooftop (~0.1 m/pixel)": 0.1,
         "Low Drone (~0.5 m/pixel)": 0.5,
         "High Drone (~1 m/pixel)": 1.0,
-        "Satellite (~10 m/pixel)": 10.0,
+        "Satellite (~0.1 m/pixel)": 0.1,
     }
     resolution = resolution_map[resolution_choice]
 
