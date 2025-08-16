@@ -66,22 +66,22 @@ elif area_input_method == "Polygon Coordinates":
         st.warning("Invalid coordinate format. Please use 'lat,lon' per line.")
 
 elif area_input_method == "Upload JPEG Image":
-    uploaded_image = st.file_uploader("Upload JPEG Image (optional):", type=["jpg", "jpeg"])
+    uploaded_image = st.file_uploader("Upload JPEG Image:", type=["jpg", "jpeg"])
     if uploaded_image:
         image = Image.open(uploaded_image)
         width, height = image.size
 
-        # New Option 2: Let user select photo source
+        # Option 2: Choose photo source
         photo_source = st.selectbox(
-            "Select photo source (assumed coverage width):",
-            ["Mobile (standing ~15m)", "Rooftop (~30m)", "Drone low (100m, ~100m)", "Drone high (250m, ~250m)"]
+            "Select photo source:",
+            ["Rooftop (~30m wide)", "Drone Low (~100m wide)", "Drone High (~250m wide)", "Satellite (~1000m wide)"]
         )
 
         assumed_widths = {
-            "Mobile (standing ~15m)": 15,
-            "Rooftop (~30m)": 30,
-            "Drone low (100m, ~100m)": 100,
-            "Drone high (250m, ~250m)": 250
+            "Rooftop (~30m wide)": 30,
+            "Drone Low (~100m wide)": 100,
+            "Drone High (~250m wide)": 250,
+            "Satellite (~1000m wide)": 1000
         }
 
         assumed_width = assumed_widths[photo_source]
@@ -89,8 +89,8 @@ elif area_input_method == "Upload JPEG Image":
         area_m2 = (width * height) * (resolution ** 2)
 
         st.success(f"Image size: {width} x {height} pixels | "
-                   f"Photo source: {photo_source} | "
-                   f"Assumed resolution: {resolution:.2f} m/pixel | "
+                   f"Source: {photo_source} | "
+                   f"Resolution: {resolution:.2f} m/pixel | "
                    f"Estimated area: {area_m2/10000:.2f} hectares")
 
 # --- Pile Height ---
