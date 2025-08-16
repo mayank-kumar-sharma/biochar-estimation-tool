@@ -1,102 +1,100 @@
 import streamlit as st
+import math
 from shapely.geometry import Polygon
 from PIL import Image
 
-# ---- Feedstock Data ----
-FEEDSTOCKS = {
-    "Rice Husk": {"density": 96, "yield_factor": 0.35, "default_height": 1.0},
-    "Wood Chips": {"density": 208, "yield_factor": 0.30, "default_height": 1.5},
-    "Corn Cobs": {"density": 160, "yield_factor": 0.33, "default_height": 1.2},
-    "Sugarcane Bagasse": {"density": 120, "yield_factor": 0.28, "default_height": 1.0},
-    "Coconut Shell": {"density": 230, "yield_factor": 0.40, "default_height": 1.0},
-    "Bamboo": {"density": 300, "yield_factor": 0.32, "default_height": 1.5},
-}
-
-# ---- Resolution mapping for sources ----
-RESOLUTIONS = {
-    "Rooftop": 0.05,   # 5 cm/pixel
-    "Low Drone": 0.2,  # 20 cm/pixel
-    "High Drone": 1.0, # 1 m/pixel
-    "Satellite": 0.8  # 0.8/pixel
+# Feedstock data
+feedstocks = {
+    "Rice husk": {"density": 96, "yield_factor": 0.25, "default_height": 1.0},
+    "Wood chips": {"density": 208, "yield_factor": 0.30, "default_height": 1.2},
+    "Corncob": {"density": 200, "yield_factor": 0.28, "default_height": 1.0},
+    "Sugarcane bagasse": {"density": 160, "yield_factor": 0.23, "default_height": 0.8},
+    "Coconut shell": {"density": 320, "yield_factor": 0.35, "default_height": 0.7},
+    "Bamboo": {"density": 300, "yield_factor": 0.33, "default_height": 1.5},
+    "Groundnut shell": {"density": 190, "yield_factor": 0.26, "default_height": 0.9},
 }
 
 st.title("🌱 Biochar Estimation Tool")
 
-# ---- Step 1: Feedstock selection ----
-feedstock = st.selectbox("Select Feedstock Type", list(FEEDSTOCKS.keys()))
-density = FEEDSTOCKS[feedstock]["density"]
-yield_factor = FEEDSTOCKS[feedstock]["yield_factor"]
-default_height = FEEDSTOCKS[feedstock]["default_height"]
+# Feedstock input
+feedstock_type = st.selectbox("Select Feedstock Type:", list(feedstocks.keys()))
 
-# ---- Step 2: Land Area Input ----
-st.header("Land Area Input")
+# Land area input method
+area_method = st.radio("Choose land area input method:", [
+    "Direct entry (hectares)",
+    "Polygon coordinates (lat/lon)",
+    "Upload JPEG image"
+])
 
-area_method = st.radio(
-    "Choose method to input land area:",
-    ("Direct entry (hectares)", "Polygon coordinates", "Upload JPEG image")
-)
-
-area_m2 = 0
-uploaded_img = None
-resolution = None
+land_area_m2 = None
 
 if area_method == "Direct entry (hectares)":
-    area_ha = st.number_input("Enter land area (hectares)", min_value=0.0, step=0.1)
-    area_m2 = area_ha * 10000
+    land_area_ha = st.number_input("Enter land area (hectares):", min_value=0.0, step=0.1)
+    land_area_m2 = land_area_ha * 10000
 
-elif area_method == "Polygon coordinates":
-    coords_text = st.text_area(
-        "Enter polygon coordinates as lat,lon pairs (one per line)"
-    )
-    if coords_text.strip():
+elif area_method == "Polygon coordinates (lat/lon)":
+    coords_text = st.text_area("Enter polygon coordinates (lat,lon per line):")
+    if coords_text:
         try:
-            coords = []
-            for line in coords_text.strip().split("\n"):
-                lat, lon = map(float, line.split(","))
-                coords.append((lon, lat))  # Shapely uses (x,y) = (lon,lat)
-            polygon = Polygon(coords)
-            area_m2 = polygon.area * (111000**2)  # rough conversion
+            coords = [tuple(map(float, line.split(','))) for line in coords_text.splitlines()]
+            poly = Polygon(coords)
+            land_area_m2 = poly.area * (111320 ** 2)  # rough conversion lat/lon -> meters²
+            st.success(f"Calculated area from polygon: {land_area_m2/10000:.2f} hectares")
         except Exception as e:
-            st.error(f"Invalid coordinates format: {e}")
+            st.error(f"Error parsing coordinates: {e}")
 
 elif area_method == "Upload JPEG image":
-    # First ask for source
-    img_source = st.selectbox(
-        "Select image source:",
-        list(RESOLUTIONS.keys())
+    resolution_choice = st.selectbox(
+        "Select image source (defines resolution):",
+        ["Rooftop (~0.1 m/pixel)", "Low Drone (~0.5 m/pixel)", "High Drone (~1 m/pixel)", "Satellite (~10 m/pixel)"]
     )
-    resolution = RESOLUTIONS[img_source]
 
-    # Then allow image upload
-    uploaded_img = st.file_uploader("Upload JPEG image", type=["jpg", "jpeg"])
-    if uploaded_img:
-        img = Image.open(uploaded_img)
-        width, height = img.size
-        area_m2 = (width * resolution) * (height * resolution)
+    resolution_map = {
+        "Rooftop (~0.1 m/pixel)": 0.1,
+        "Low Drone (~0.5 m/pixel)": 0.5,
+        "High Drone (~1 m/pixel)": 1.0,
+        "Satellite (~10 m/pixel)": 10.0,
+    }
+    resolution = resolution_map[resolution_choice]
 
-# ---- Step 3: Pile height ----
-pile_height = st.number_input(
-    f"Enter pile height (m) [default: {default_height} m]",
-    min_value=0.1,
-    step=0.1,
-    value=default_height,
-)
+    uploaded_file = st.file_uploader("Upload JPEG image", type=["jpg", "jpeg"])
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        width, height = image.size
+        st.image(image, caption="Uploaded Image", use_column_width=True)
 
-# ---- Step 4: Calculations ----
-if area_m2 > 0:
-    volume_m3 = area_m2 * pile_height
-    biomass_mass = volume_m3 * density
+        # Calculate area in hectares
+        land_area_m2 = (width * resolution) * (height * resolution)
+        land_area_ha = land_area_m2 / 10000
+
+        # ✅ Show user how many hectares were calculated
+        st.success(f"Calculated land area from image: **{land_area_ha:.2f} hectares**")
+
+# Pile height input
+if feedstock_type:
+    default_height = feedstocks[feedstock_type]["default_height"]
+    pile_height = st.number_input(
+        "Enter pile height (m):",
+        min_value=0.1, step=0.1, value=default_height
+    )
+
+# Perform calculations if area is available
+if land_area_m2 and feedstock_type:
+    density = feedstocks[feedstock_type]["density"]
+    yield_factor = feedstocks[feedstock_type]["yield_factor"]
+
+    volume = land_area_m2 * pile_height
+    biomass_mass = volume * density
     biochar_yield = biomass_mass * yield_factor
-    area_ha = area_m2 / 10000
-    application_rate = biochar_yield / area_ha if area_ha > 0 else 0
+    application_rate = biochar_yield / (land_area_m2 / 10000)
 
-    st.success("✅ Estimation Results")
-    st.write(f"**Biochar Yield:** {biochar_yield:.2f} kg")
-    st.write(f"**Land Area Covered:** {area_ha:.2f} hectares")
-    st.write(f"**Application Rate:** {application_rate:.2f} kg/ha")
+    st.subheader("Results")
+    st.write(f"**Biochar Yield:** {biochar_yield:,.2f} kg")
+    st.write(f"**Land Area Covered:** {land_area_m2/10000:.2f} hectares")
+    st.write(f"**Application Rate:** {application_rate:,.2f} kg/ha")
 
     with st.expander("Calculation Details"):
-        st.write(f"Volume = Area × Height = {area_m2:.2f} m² × {pile_height} m = {volume_m3:.2f} m³")
-        st.write(f"Biomass Mass = Volume × Density = {volume_m3:.2f} × {density} = {biomass_mass:.2f} kg")
-        st.write(f"Biochar Yield = Biomass Mass × Yield Factor = {biomass_mass:.2f} × {yield_factor} = {biochar_yield:.2f} kg")
-        st.write(f"Application Rate = {biochar_yield:.2f} ÷ {area_ha:.2f} ha = {application_rate:.2f} kg/ha")
+        st.write(f"Volume = {land_area_m2:,.2f} m² × {pile_height} m = {volume:,.2f} m³")
+        st.write(f"Biomass Mass = {volume:,.2f} m³ × {density} kg/m³ = {biomass_mass:,.2f} kg")
+        st.write(f"Biochar Yield = {biomass_mass:,.2f} kg × {yield_factor} = {biochar_yield:,.2f} kg")
+        st.write(f"Application Rate = {biochar_yield:,.2f} kg ÷ {land_area_m2/10000:.2f} ha = {application_rate:,.2f} kg/ha")
