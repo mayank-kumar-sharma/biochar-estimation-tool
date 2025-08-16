@@ -17,7 +17,6 @@ FEEDSTOCK_DATA = {
 }
 
 # Fixed defaults
-DEFAULT_RESOLUTION = 0.1    # meters per pixel for JPEG images (updated to 0.1 m/pixel)
 COVERAGE_FRACTION = 0.05    # 5% of land actually covered by feedstock piles
 
 # Geod for accurate area from lat/lon
@@ -38,7 +37,7 @@ This tool estimates the **practical** biomass and biochar you can expect given:
 # --- Feedstock Selection ---
 feedstock_type = st.selectbox(
     "Select Feedstock Type",
-    list(FEEDSTOCK_DATA.keys())  # Only show feedstock names, no extra details
+    list(FEEDSTOCK_DATA.keys())  # Only show feedstock names
 )
 feedstock_info = FEEDSTOCK_DATA[feedstock_type]
 
@@ -71,9 +70,27 @@ elif area_input_method == "Upload JPEG Image":
     if uploaded_image:
         image = Image.open(uploaded_image)
         width, height = image.size
-        area_m2 = (width * height) * (DEFAULT_RESOLUTION ** 2)
+
+        # New Option 2: Let user select photo source
+        photo_source = st.selectbox(
+            "Select photo source (assumed coverage width):",
+            ["Mobile (standing ~15m)", "Rooftop (~30m)", "Drone low (100m, ~100m)", "Drone high (250m, ~250m)"]
+        )
+
+        assumed_widths = {
+            "Mobile (standing ~15m)": 15,
+            "Rooftop (~30m)": 30,
+            "Drone low (100m, ~100m)": 100,
+            "Drone high (250m, ~250m)": 250
+        }
+
+        assumed_width = assumed_widths[photo_source]
+        resolution = assumed_width / width  # meters per pixel
+        area_m2 = (width * height) * (resolution ** 2)
+
         st.success(f"Image size: {width} x {height} pixels | "
-                   f"Assumed resolution: {DEFAULT_RESOLUTION} m/pixel | "
+                   f"Photo source: {photo_source} | "
+                   f"Assumed resolution: {resolution:.2f} m/pixel | "
                    f"Estimated area: {area_m2/10000:.2f} hectares")
 
 # --- Pile Height ---
