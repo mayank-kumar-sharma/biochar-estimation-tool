@@ -18,7 +18,7 @@ FEEDSTOCK_DATA = {
 
 # Fixed defaults
 COVERAGE_FRACTION = 0.05    # 5% of land actually covered by feedstock piles
-DEFAULT_RESOLUTION = 0.05 # fixed resolution (m/pixel)
+DEFAULT_RESOLUTION = 0.04   # fixed resolution (m/pixel)
 
 # Geod for accurate area from lat/lon
 geod = Geod(ellps="WGS84")
