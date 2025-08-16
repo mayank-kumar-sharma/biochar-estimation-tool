@@ -17,7 +17,7 @@ RESOLUTIONS = {
     "Rooftop": 0.05,   # 5 cm/pixel
     "Low Drone": 0.2,  # 20 cm/pixel
     "High Drone": 1.0, # 1 m/pixel
-    "Satellite": 10.0  # 10 m/pixel
+    "Satellite": 0.8  # 0.8/pixel
 }
 
 st.title("🌱 Biochar Estimation Tool")
