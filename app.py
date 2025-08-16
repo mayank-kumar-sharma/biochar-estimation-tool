@@ -61,7 +61,7 @@ elif area_method == "Upload JPEG image":
     if uploaded_file is not None:
         image = Image.open(uploaded_file)
         width, height = image.size
-        st.image(image, caption="Uploaded Image", use_column_width=True)
+        st.image(image, caption="Uploaded Image", use_container_width=True)  # ✅ FIXED HERE
 
         # Calculate area in hectares
         land_area_m2 = (width * resolution) * (height * resolution)
