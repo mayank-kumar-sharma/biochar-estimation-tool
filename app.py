@@ -66,28 +66,28 @@ elif area_input_method == "Polygon Coordinates":
         st.warning("Invalid coordinate format. Please use 'lat,lon' per line.")
 
 elif area_input_method == "Upload JPEG Image":
+    # --- Ask photo source first ---
+    photo_source = st.selectbox(
+        "Select photo source:",
+        ["Rooftop (~0.10 m/pixel)", "Drone Low (~0.50 m/pixel)", "Drone High (~1.00 m/pixel)", "Satellite (~0.08 m/pixel)"]
+    )
+
+    resolution_map = {
+        "Rooftop (~0.10 m/pixel)": 0.10,
+        "Drone Low (~0.50 m/pixel)": 0.50,
+        "Drone High (~1.00 m/pixel)": 1.00,
+        "Satellite (~0.08 m/pixel)": 0.08
+    }
+    resolution = resolution_map[photo_source]
+
+    # --- Then ask to upload image ---
     uploaded_image = st.file_uploader("Upload JPEG Image:", type=["jpg", "jpeg"])
     if uploaded_image:
         image = Image.open(uploaded_image)
         width, height = image.size
 
-        # --- Fixed resolution per source ---
-        photo_source = st.selectbox(
-            "Select photo source:",
-            ["Rooftop (~0.10 m/pixel)", "Drone Low (~0.50 m/pixel)", "Drone High (~1.00 m/pixel)", "Satellite (~0.08 m/pixel)"]
-        )
-
-        resolution_map = {
-            "Rooftop (~0.10 m/pixel)": 0.10,
-            "Drone Low (~0.50 m/pixel)": 0.50,
-            "Drone High (~1.00 m/pixel)": 1.00,
-            "Satellite (~0.08 m/pixel)": 0.08
-        }
-
-        resolution = resolution_map[photo_source]
         area_m2 = (width * resolution) * (height * resolution)
 
-        st.image(image, caption="Uploaded Image", use_container_width=True)
         st.success(f"Image size: {width} x {height} pixels | "
                    f"Resolution: {resolution:.2f} m/pixel | "
                    f"Estimated area: {area_m2/10000:.2f} hectares")
@@ -132,4 +132,5 @@ if st.button("📊 Show Practical Estimate"):
 
 st.markdown("---")
 st.markdown("Made with ❤️ by **Mayank Kumar Sharma**")
+
 
