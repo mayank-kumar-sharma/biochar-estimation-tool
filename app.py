@@ -67,15 +67,30 @@ elif area_input_method == "Polygon Coordinates":
         st.warning("Invalid coordinate format. Please use 'lat,lon' per line.")
 
 elif area_input_method == "Upload JPEG Image":
+    image_source = st.selectbox(
+        "Where was this image taken?",
+        ["Satellite", "Low Drone", "High Drone"]
+    )
+
     uploaded_image = st.file_uploader("Upload JPEG Image:", type=["jpg", "jpeg"])
     if uploaded_image:
         image = Image.open(uploaded_image)
         width, height = image.size
 
-        area_m2 = (width * DEFAULT_RESOLUTION) * (height * DEFAULT_RESOLUTION)
+        # Set resolution based on image source
+        if image_source == "Satellite":
+            resolution = 0.04
+        elif image_source == "Low Drone":
+            resolution = 0.06
+        elif image_source == "High Drone":
+            resolution = 0.02
+        else:
+            resolution = 0.04  # fallback
+
+        area_m2 = (width * resolution) * (height * resolution)
 
         st.success(f"Image size: {width} x {height} pixels | "
-                   f"Resolution: {DEFAULT_RESOLUTION:.2f} m/pixel | "
+                   f"Resolution: {resolution:.2f} m/pixel | "
                    f"Estimated area: {area_m2/10000:.2f} hectares")
 
 # --- Pile Height ---
@@ -118,4 +133,3 @@ if st.button("📊 Show Practical Estimate"):
 
 st.markdown("---")
 st.markdown("Made with ❤️ by **Mayank Kumar Sharma**")
-
