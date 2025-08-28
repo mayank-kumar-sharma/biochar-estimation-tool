@@ -8,128 +8,119 @@ from pyproj import Geod
 FEEDSTOCK_DATA = {
     "Rice husk": {"density": 96, "yield_factor": 0.25, "default_height": 0.2},
     "Wood chips": {"density": 208, "yield_factor": 0.30, "default_height": 0.3},
-    "Corn cobs": {"density": 190, "yield_factor": 0.28, "default_height": 0.25},
-    "Coconut shells": {"density": 220, "yield_factor": 0.35, "default_height": 0.3},
-    "Bamboo": {"density": 180, "yield_factor": 0.33, "default_height": 0.25},
-    "Sugarcane bagasse": {"density": 140, "yield_factor": 0.22, "default_height": 0.2},
-    "Groundnut shells": {"density": 130, "yield_factor": 0.26, "default_height": 0.2},
-    "Sludge": {"density": 110, "yield_factor": 0.50, "default_height": 0.15},
+    "Maize stalks": {"density": 120, "yield_factor": 0.28, "default_height": 0.25},
+    "Coconut shells": {"density": 230, "yield_factor": 0.35, "default_height": 0.3},
+    "Sugarcane bagasse": {"density": 150, "yield_factor": 0.27, "default_height": 0.25},
+    "Groundnut shells": {"density": 170, "yield_factor": 0.32, "default_height": 0.25},
+    "Bamboo": {"density": 300, "yield_factor": 0.33, "default_height": 0.35},
+    "Other": {"density": 180, "yield_factor": 0.28, "default_height": 0.25},  # General/average values
 }
 
-# Fixed defaults
-COVERAGE_FRACTION = 0.05    # 5% of land actually covered by feedstock piles
-DEFAULT_RESOLUTION = 0.04   # fixed resolution (m/pixel)
+# Image source resolutions (defaults, hidden from UI)
+IMAGE_SOURCE_RESOLUTIONS = {
+    "Satellite": 10,      # meters per pixel
+    "Low Drone (≈50m altitude)": 0.1,
+    "High Drone (≈120m altitude)": 0.3,
+}
 
-# Geod for accurate area from lat/lon
-geod = Geod(ellps="WGS84")
+# --- Functions ---
+def calculate_area_from_polygon(coords):
+    geod = Geod(ellps="WGS84")
+    poly = Polygon(coords)
+    lon, lat = poly.exterior.coords.xy
+    area, _ = geod.polygon_area_perimeter(lon, lat)
+    return abs(area)  # m²
 
-st.set_page_config(page_title="Biochar Estimator", layout="centered")
-st.title("🌱 Biochar Yield and Application Estimator")
+def calculate_area_from_image(image, real_world_width_m):
+    width_px, height_px = image.size
+    meters_per_pixel = real_world_width_m / width_px
+    area_m2 = (width_px * meters_per_pixel) * (height_px * meters_per_pixel)
+    return area_m2
 
-st.markdown("""
-This tool estimates the **practical** biomass and biochar you can expect given:
-- a feedstock type,
-- land area (ha), and
-- pile height (m).
+def calculate_from_resolution(image, resolution_m_per_px):
+    width_px, height_px = image.size
+    area_m2 = (width_px * resolution_m_per_px) * (height_px * resolution_m_per_px)
+    return area_m2
 
-**Practical estimate** assumes that only **5%** of your land is actually covered by biomass piles (this keeps results realistic for most farms).
-""")
+# --- Streamlit UI ---
+st.title("🌱 Biochar Estimation Tool")
 
 # --- Feedstock Selection ---
-feedstock_type = st.selectbox(
-    "Select Feedstock Type",
-    list(FEEDSTOCK_DATA.keys())  # Only show feedstock names
-)
-feedstock_info = FEEDSTOCK_DATA[feedstock_type]
+feedstock_type = st.selectbox("Select Feedstock Type", list(FEEDSTOCK_DATA.keys()))
+feedstock = FEEDSTOCK_DATA[feedstock_type]
 
-# --- Area Input Options ---
-st.subheader("1️⃣ Enter Land Area")
-area_input_method = st.radio("Choose area input method:", ["Direct (hectares)", "Polygon Coordinates", "Upload JPEG Image"])
+# --- Area Input Method ---
+area_input_method = st.radio(
+    "Select Land Area Input Method",
+    ["Direct entry (hectares)", "Polygon coordinates (lat/lon)", "Upload image (JPEG)"]
+)
 
 area_m2 = None
 
-if area_input_method == "Direct (hectares)":
-    hectares = st.number_input("Enter area in hectares:", min_value=0.0, format="%.2f")
-    area_m2 = hectares * 10000
+if area_input_method == "Direct entry (hectares)":
+    area_ha = st.number_input("Enter land area (hectares)", min_value=0.0, step=0.1)
+    area_m2 = area_ha * 10000
 
-elif area_input_method == "Polygon Coordinates":
-    coords_text = st.text_area("Enter coordinates (lat,lon) one per line:", placeholder="25.2,73.1\n25.2,73.2\n...")
-    try:
-        coords = [tuple(map(float, re.split(r"[,\s]+", line.strip()))) for line in coords_text.strip().split("\n") if line.strip()]
-        if len(coords) >= 3:
-            lons, lats = zip(*[(lon, lat) for lat, lon in coords])
-            area_m2, _ = geod.polygon_area_perimeter(lons, lats)
-            area_m2 = abs(area_m2)
-            st.success(f"Polygon area: {area_m2/10000:.2f} hectares")
-        else:
-            st.info("Please enter at least 3 coordinate points.")
-    except Exception:
-        st.warning("Invalid coordinate format. Please use 'lat,lon' per line.")
-
-elif area_input_method == "Upload JPEG Image":
-    image_source = st.selectbox(
-        "Where was this image taken?",
-        ["Satellite", "Low Drone", "High Drone"]
+elif area_input_method == "Polygon coordinates (lat/lon)":
+    coords_text = st.text_area(
+        "Enter polygon coordinates (lat,lon per line)",
+        "24.58,73.69\n24.58,73.70\n24.59,73.70\n24.59,73.69"
     )
-
-    uploaded_image = st.file_uploader("Upload JPEG Image:", type=["jpg", "jpeg"])
-    if uploaded_image:
-        image = Image.open(uploaded_image)
-        width, height = image.size
-
-        # Set resolution based on image source
-        if image_source == "Satellite":
-            resolution = 0.04
-        elif image_source == "Low Drone":
-            resolution = 0.06
-        elif image_source == "High Drone":
-            resolution = 0.02
+    try:
+        coords = [tuple(map(float, re.split(r"[ ,]+", line.strip()))) for line in coords_text.split("\n") if line.strip()]
+        if len(coords) >= 3:
+            area_m2 = calculate_area_from_polygon(coords)
+            st.success(f"Polygon Area: {area_m2/10000:.2f} hectares")
         else:
-            resolution = 0.04  # fallback
+            st.warning("Enter at least 3 coordinates for a valid polygon.")
+    except Exception as e:
+        st.error(f"Invalid coordinates: {e}")
 
-        area_m2 = (width * resolution) * (height * resolution)
+elif area_input_method == "Upload image (JPEG)":
+    uploaded_file = st.file_uploader("Upload a JPEG image", type=["jpg", "jpeg"])
+    if uploaded_file:
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Uploaded Image", use_container_width=True)
 
-        st.success(f"Image size: {width} x {height} pixels | "
-                   f"Resolution: {resolution:.2f} m/pixel | "
-                   f"Estimated area: {area_m2/10000:.2f} hectares")
+        source_type = st.radio(
+            "Select Image Source",
+            ["Satellite", "Low Drone (≈50m altitude)", "High Drone (≈120m altitude)", "Manual width entry"]
+        )
 
-# --- Pile Height ---
-st.subheader("2️⃣ Enter Feedstock Pile Height")
-def_height = feedstock_info["default_height"]
-height_m = st.number_input(f"Enter pile height (meters) — default: {def_height} m:", min_value=0.0, value=def_height, step=0.01)
+        if source_type in IMAGE_SOURCE_RESOLUTIONS:
+            resolution = IMAGE_SOURCE_RESOLUTIONS[source_type]
+            area_m2 = calculate_from_resolution(image, resolution)
+        else:
+            real_world_width_m = st.number_input("Enter real-world width of the image (m)", min_value=1.0)
+            if real_world_width_m > 0:
+                area_m2 = calculate_area_from_image(image, real_world_width_m)
 
-# --- Calculate Button ---
-if st.button("📊 Show Practical Estimate"):
-    if not area_m2 or height_m <= 0:
-        st.info("Please complete all inputs (area and pile height) to see results.")
-    else:
-        density = feedstock_info["density"]
-        yield_factor = feedstock_info["yield_factor"]
-        area_ha = area_m2 / 10000.0
+# --- Pile Height Input ---
+pile_height = st.number_input(
+    "Enter feedstock pile height (m)", 
+    value=feedstock["default_height"], 
+    min_value=0.1, 
+    step=0.05
+)
 
-        pile_area_m2 = area_m2 * COVERAGE_FRACTION
-        volume_m3 = pile_area_m2 * height_m
-        biomass_kg = volume_m3 * density
-        biochar_kg = biomass_kg * yield_factor
-        application_rate_kg_per_ha = biochar_kg / area_ha if area_ha > 0 else 0
+# --- Calculations ---
+if area_m2:
+    volume_m3 = area_m2 * pile_height
+    biomass_mass = volume_m3 * feedstock["density"]
+    biochar_yield = biomass_mass * feedstock["yield_factor"]
+    application_rate = biochar_yield / (area_m2 / 10000)
 
-        st.subheader(f"✅ Practical Results (assuming {COVERAGE_FRACTION*100:.1f}% pile coverage)")
-        st.write(f"**Estimated Biomass Input:** {biomass_kg:,.2f} kg")
-        st.write(f"**Estimated Biochar Yield:** {biochar_kg:,.2f} kg")
-        st.write(f"**Application Rate (over full area):** {application_rate_kg_per_ha:,.2f} kg/ha")
+    # --- Results ---
+    st.subheader("📊 Results")
+    st.write(f"**Biomass Mass:** {biomass_mass:,.2f} kg")
+    st.write(f"**Biochar Yield:** {biochar_yield:,.2f} kg")
+    st.write(f"**Application Rate:** {application_rate:,.2f} kg/ha")
 
-        if application_rate_kg_per_ha > 10000:
-            st.warning("⚠ The application rate exceeds the recommended maximum of 10 t/ha. Consider reducing pile height or coverage.")
-
-        with st.expander("📌 Calculation Details (practical)"):
-            st.write(f"Feedstock: {feedstock_type}")
-            st.write(f"Total area: {area_m2:.2f} m² ({area_ha:.2f} ha)")
-            st.write(f"Pile footprint (assumed): {pile_area_m2:.2f} m² ({pile_area_m2/10000:.2f} ha)")
-            st.write(f"Pile height: {height_m} m")
-            st.write(f"Volume (piles): {volume_m3:.2f} m³")
-            st.write(f"Density: {density} kg/m³")
-            st.write(f"Yield factor: {yield_factor}")
-            st.write(f"Coverage fraction used: {COVERAGE_FRACTION:.3f} ({COVERAGE_FRACTION*100:.1f}%)")
-
-st.markdown("---")
-st.markdown("Made with ❤️ by **Mayank Kumar Sharma**")
+    with st.expander("Calculation Details"):
+        st.write(f"Area: {area_m2:.2f} m² ({area_m2/10000:.2f} ha)")
+        st.write(f"Volume: {volume_m3:.2f} m³")
+        st.write(f"Feedstock density: {feedstock['density']} kg/m³")
+        st.write(f"Yield factor: {feedstock['yield_factor']}")
+        st.write(f"Pile height: {pile_height} m")
+else:
+    st.info("Please complete the inputs to see results.")
