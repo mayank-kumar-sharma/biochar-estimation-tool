@@ -103,12 +103,12 @@ if st.button("📊 Show Practical Estimate"):
             st.write(f"Volume (piles): {volume_m3:.2f} m³")
             st.write(f"Density: {density} kg/m³")
             # -----------------------------
-# Footer
-# -----------------------------
-st.divider()
-st.caption("Biochar MRV Calculator | Demo Tool 🌱")
-st.markdown("💡 Made with ❤️ by **Mayank Kumar Sharma**")
-            st.write(f"Yield factor: {yield_factor}")
-            st.write(f"Coverage fraction used: {coverage_fraction:.3f} ({coverage_fraction*100:.1f}%)")
+            # Footer
+            # -----------------------------
+            st.divider()
+            st.caption("Biochar MRV Calculator | Demo Tool 🌱")
+            st.markdown("💡 Made with ❤️ by **Mayank Kumar Sharma**")
+                   st.write(f"Yield factor: {yield_factor}")
+                   st.write(f"Coverage fraction used: {coverage_fraction:.3f} ({coverage_fraction*100:.1f}%)")
 
 st.markdown("---")
